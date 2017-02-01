@@ -1,0 +1,17 @@
+{
+    "version": "1.0.0",
+    "summary": "CORS middleware for elm-serverless",
+    "repository": "https://github.com/ktonon/elm-serverless-cors.git",
+    "license": "MIT",
+    "source-directories": [
+        "src"
+    ],
+    "exposed-modules": [
+        "Serverless.Cors"
+    ],
+    "dependencies": {
+        "elm-lang/core": "5.1.1 <= v < 6.0.0",
+        "ktonon/elm-serverless": "3.0.1 <= v < 4.0.0"
+    },
+    "elm-version": "0.18.0 <= v < 0.19.0"
+}
