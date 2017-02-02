@@ -285,8 +285,11 @@ allowHeaders headers conn =
                     conn
 
         Exactly h ->
-            conn
-                |> header
-                    ( "access-control-allow-headers"
-                    , h |> String.join ","
-                    )
+            if h |> List.isEmpty then
+                conn
+            else
+                conn
+                    |> header
+                        ( "access-control-allow-headers"
+                        , h |> String.join ","
+                        )

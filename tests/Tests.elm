@@ -1,6 +1,5 @@
 module Tests exposing (..)
 
-import Dict
 import ElmTestBDDStyle exposing (..)
 import Expect exposing (..)
 import Serverless.Conn.Types exposing (..)
@@ -72,6 +71,37 @@ middlewareTests =
             , testHeader
                 (conn |> allowCredentials True)
                 [ ( "access-control-allow-credentials", "true" ) ]
+            , testHeader
+                (conn |> maxAge -1)
+                []
+            , testHeader
+                (conn |> maxAge 0)
+                []
+            , testHeader
+                (conn |> maxAge 10)
+                [ ( "access-control-max-age", "10" ) ]
+            , testHeader
+                (conn
+                    |> exposeHeaders [ "foo", "bar-car" ]
+                )
+                [ ( "access-control-expose-headers", "foo,bar-car" ) ]
+            , testHeader
+                (conn |> exposeHeaders [])
+                []
+            , testHeader
+                (conn |> cors nullConfig)
+                []
+            , testHeader
+                (conn
+                    |> cors
+                        { nullConfig
+                            | origin = ReflectRequest
+                            , methods = [ GET, OPTIONS ]
+                        }
+                )
+                [ ( "access-control-allow-methods", "GET,OPTIONS" )
+                , ( "access-control-allow-origin", "*" )
+                ]
             ]
         ]
 
