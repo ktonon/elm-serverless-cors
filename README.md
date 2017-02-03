@@ -6,10 +6,25 @@
 
 This is [CORS][] middleware for [elm-serverless][].
 
-There are two ways to use the middleware:
+## Usage
 
-* use `cors` passing in a `Config` (likely decoded from JSON using `configDecoder`)
-* call individual headers like `allowOrigin` and `allowMethods` separately
+```elm
+import Serverless.Conn exposing (pipeline, plug)
+import Serverless.Conn.Types exposing (Method(..))
+import Serverless.Cors exposing (..)
+
+
+myPipeline =
+    pipeline
+        -- Sets access-control-allow-origin
+        -- the same as the origin request header
+        -- or if that is not found then "*"
+        |>
+            plug (allowOrigin ReflectRequest)
+        -- Sets access-control-allow-methods
+        |>
+            plug (allowMethods [ GET, OPTIONS ])
+```
 
 [CORS]:https://en.wikipedia.org/wiki/Cross-origin_resource_sharing
 [elm-serverless]:http://package.elm-lang.org/packages/ktonon/elm-serverless/latest

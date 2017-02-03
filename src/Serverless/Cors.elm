@@ -16,11 +16,6 @@ module Serverless.Cors
 
 {-| CORS Middleware for elm-serverless.
 
-There are two ways to use the middleware:
-
-* use `cors` passing in a `Config` (likely decoded from JSON using `configDecoder`)
-* call individual headers like `allowOrigin` and `allowMethods` separately
-
 ## Types
 
 @docs Config, Reflectable
