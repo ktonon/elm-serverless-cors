@@ -18,7 +18,7 @@ module Serverless.Cors
 
 There are two ways to use the middleware:
 
-* use `cors` passing in a `Config` (likely decoded from JSON using configDecoder)
+* use `cors` passing in a `Config` (likely decoded from JSON using `configDecoder`)
 * call individual headers like `allowOrigin` and `allowMethods` separately
 
 ## Types
@@ -47,7 +47,7 @@ import Toolkit.Helpers exposing (maybeList)
 -- TYPES
 
 
-{-|
+{-| Specify all CORS configuration in one record.
 -}
 type alias Config =
     { origin : Reflectable (List String)
@@ -59,7 +59,12 @@ type alias Config =
     }
 
 
-{-|
+{-| A reflectable header value.
+
+A reflectable value can either be
+
+* `ReflectRequest` derive the headers from the request
+* `Exactly` set to a specific value
 -}
 type Reflectable a
     = ReflectRequest
@@ -70,7 +75,7 @@ type Reflectable a
 -- DECODERS
 
 
-{-|
+{-| Decode CORS configuration from JSON.
 -}
 configDecoder : Decoder Config
 configDecoder =
@@ -83,7 +88,10 @@ configDecoder =
         |> optional "headers" reflectableDecoder (Exactly [])
 
 
-{-|
+{-| Decode a reflectable value from JSON.
+
+* `"*"` decodes to `ReflectRequest`
+* `"foo,bar"` or `["foo", "bar"]` decodes to `Exactly ["foo", "bar"]`
 -}
 reflectableDecoder : Decoder (Reflectable (List String))
 reflectableDecoder =
@@ -126,7 +134,7 @@ stringListDecoder =
         ]
 
 
-{-|
+{-| Case-insensitive decode a list of HTTP methods.
 -}
 methodsDecoder : Decoder (List Method)
 methodsDecoder =
@@ -173,7 +181,11 @@ methodsDecoder =
 -- MIDDLEWARE
 
 
-{-|
+{-| Set CORS headers according to a configuration record.
+
+This function is best used when the configuration is provided externally and
+decoded using `configDecoder`. For example, npm rc and AWS Lambda environment
+variables can be used as the source of CORS configuration.
 -}
 cors : Config -> Conn config model -> Conn config model
 cors config =
@@ -185,7 +197,10 @@ cors config =
         >> allowHeaders config.headers
 
 
-{-|
+{-| Sets `access-control-allow-origin`.
+
+`ReflectRequest` will reflect the request `origin` header, or if absent, will
+just be set to `*`
 -}
 allowOrigin : Reflectable (List String) -> Conn config model -> Conn config model
 allowOrigin origin conn =
@@ -211,7 +226,7 @@ allowOrigin origin conn =
                         )
 
 
-{-|
+{-| Sets `access-control-expose-headers`.
 -}
 exposeHeaders : List String -> Conn config model -> Conn config model
 exposeHeaders headers conn =
@@ -225,7 +240,9 @@ exposeHeaders headers conn =
                 )
 
 
-{-|
+{-| Sets `access-control-max-age`.
+
+If the value is not positive, the header will not be set.
 -}
 maxAge : Int -> Conn config model -> Conn config model
 maxAge age conn =
@@ -239,7 +256,9 @@ maxAge age conn =
         conn
 
 
-{-|
+{-| Sets `access-control-allow-credentials`.
+
+Only sets the header if the value is `True`.
 -}
 allowCredentials : Bool -> Conn config model -> Conn config model
 allowCredentials allow conn =
@@ -249,7 +268,7 @@ allowCredentials allow conn =
         conn
 
 
-{-|
+{-| Sets `access-control-allow-methods`.
 -}
 allowMethods : List Method -> Conn config model -> Conn config model
 allowMethods methods conn =
@@ -263,7 +282,10 @@ allowMethods methods conn =
                 )
 
 
-{-|
+{-| Sets `access-control-allow-headers`.
+
+`ReflectRequest` will reflect the request `access-control-request-headers` headers
+or if absent, it will not set the header at all.
 -}
 allowHeaders : Reflectable (List String) -> Conn config model -> Conn config model
 allowHeaders headers conn =
