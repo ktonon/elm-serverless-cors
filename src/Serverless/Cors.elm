@@ -77,7 +77,7 @@ configDecoder =
     decode Config
         |> optional "origin" reflectableDecoder (Exactly [])
         |> optional "expose" stringListDecoder []
-        |> optional "maxAge" positiveIntDecoder 0
+        |> optional "maxAge" maxAgeDecoder 0
         |> optional "credentials" truthyDecoder False
         |> optional "methods" methodsDecoder []
         |> optional "headers" reflectableDecoder (Exactly [])
@@ -100,16 +100,29 @@ reflectableDecoder =
             )
 
 
-positiveIntDecoder : Decoder Int
-positiveIntDecoder =
-    int
-        |> andThen
-            (\val ->
-                if val < 0 then
-                    fail "negative value when zero or positive was expected"
-                else
-                    succeed val
-            )
+maxAgeDecoder : Decoder Int
+maxAgeDecoder =
+    oneOf
+        [ int |> andThen positiveIntDecoder
+        , string
+            |> andThen
+                (\w ->
+                    case String.toInt w of
+                        Ok val ->
+                            positiveIntDecoder val
+
+                        Err err ->
+                            fail ("Decoding maxAge: " ++ err)
+                )
+        ]
+
+
+positiveIntDecoder : Int -> Decoder Int
+positiveIntDecoder val =
+    if val < 0 then
+        fail "negative value when zero or positive was expected"
+    else
+        succeed val
 
 
 truthyDecoder : Decoder Bool

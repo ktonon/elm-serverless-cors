@@ -118,7 +118,13 @@ decoderTests =
             , ( """{ "origin": ["x.y.z", "a.b.c"] }"""
               , DecodesTo { nullConfig | origin = Exactly [ "x.y.z", "a.b.c" ] }
               )
+            , ( """{ "origin": "x.y.z,a.b.c" }"""
+              , DecodesTo { nullConfig | origin = Exactly [ "x.y.z", "a.b.c" ] }
+              )
             , ( """{ "methods": ["get", "options"] }"""
+              , DecodesTo { nullConfig | methods = [ GET, OPTIONS ] }
+              )
+            , ( """{ "methods": "get,options" }"""
               , DecodesTo { nullConfig | methods = [ GET, OPTIONS ] }
               )
             , ( """{ "expose": "foo-bar,car" }"""
@@ -126,6 +132,12 @@ decoderTests =
               )
             , ( """{ "maxAge": 8 }"""
               , DecodesTo { nullConfig | maxAge = 8 }
+              )
+            , ( """{ "maxAge": "8" }"""
+              , DecodesTo { nullConfig | maxAge = 8 }
+              )
+            , ( """{ "maxAge": "four" }"""
+              , FailsToDecode
               )
             , ( """{ "maxAge": -1 }"""
               , FailsToDecode
@@ -152,6 +164,9 @@ decoderTests =
               , DecodesTo { nullConfig | headers = ReflectRequest }
               )
             , ( """{ "headers": ["foo-bar", "car"] }"""
+              , DecodesTo { nullConfig | headers = Exactly [ "foo-bar", "car" ] }
+              )
+            , ( """{ "headers": "foo-bar,car" }"""
               , DecodesTo { nullConfig | headers = Exactly [ "foo-bar", "car" ] }
               )
             ]
