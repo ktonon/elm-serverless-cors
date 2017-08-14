@@ -1,10 +1,13 @@
 module Tests exposing (..)
 
 import ElmTestBDDStyle exposing (..)
-import Expect exposing (..)
-import Serverless.Conn.Types exposing (..)
+import Expect
+import Expect.Extra as Expect exposing (regexPattern)
+import Json.Decode exposing (decodeString)
+import Json.Encode exposing (encode)
+import Serverless.Conn as Conn
+import Serverless.Conn.Request as Request exposing (Method(..))
 import Serverless.Cors exposing (..)
-import Serverless.Types exposing (PipelineState(..), Sendable(..))
 import Test exposing (..)
 import Test.Extra exposing (..)
 
@@ -17,81 +20,93 @@ all =
         ]
 
 
-testHeader : Conn -> List ( String, String ) -> Test
-testHeader conn headers =
-    it ("headers: " ++ (headers |> toString)) <|
-        case conn.resp of
-            Unsent resp ->
-                expect
-                    resp.headers
-                    to
-                    equal
-                    headers
-
-            Sent ->
-                fail ""
+testHeader : String -> Conn -> List ( String, String ) -> Test
+testHeader label conn headers =
+    it (label ++ " (headers: " ++ (headers |> toString) ++ ")") <|
+        let
+            resp =
+                conn
+                    |> Conn.jsonEncodedResponse
+                    |> encode 0
+        in
+        if List.isEmpty headers then
+            Expect.match
+                (regexPattern
+                    """"headers":{"content-type":"text/text; charset=utf-8","cache-control":"max-age=0, private, must-revalidate"}"""
+                )
+                resp
+        else
+            Expect.all
+                (headers
+                    |> List.map
+                        (\( key, val ) ->
+                            Expect.match
+                                (regexPattern <| "\"" ++ key ++ "\":\"" ++ val ++ "\"")
+                        )
+                )
+                resp
 
 
 middlewareTests : Test
 middlewareTests =
     describe "CORS Middleware"
         [ describe "allowOrigin"
-            [ testHeader
+            [ testHeader "Reflect allow missing"
                 (conn |> allowOrigin ReflectRequest)
                 [ ( "access-control-allow-origin", "*" ) ]
-            , testHeader
-                (connWithHeader "origin" "foo.bar.com"
+            , testHeader "Reflect allow provided"
+                (connWithHeader "origin" "foo.bar.ca"
                     |> allowOrigin ReflectRequest
                 )
-                [ ( "access-control-allow-origin", "foo.bar.com" ) ]
-            , testHeader
+                [ ( "access-control-allow-origin", "foo.bar.ca" ) ]
+            , testHeader "Allow exactly none"
                 (conn
                     |> allowOrigin (Exactly [])
                 )
                 []
-            , testHeader
+            , testHeader "Allow exactly one"
                 (conn
                     |> allowOrigin (Exactly [ "foo.bar.com" ])
                 )
                 [ ( "access-control-allow-origin", "foo.bar.com" ) ]
-            , testHeader
+            , testHeader "Reflect headers empty"
                 (conn |> allowHeaders ReflectRequest)
                 []
-            , testHeader
+            , testHeader "Reflect headers one"
                 (connWithHeader "access-control-request-headers" "foo,bar,car"
                     |> allowHeaders ReflectRequest
                 )
                 [ ( "access-control-allow-headers", "foo,bar,car" ) ]
-            , testHeader
+            , testHeader "Allow methods"
                 (conn |> allowMethods [ GET, OPTIONS ])
                 [ ( "access-control-allow-methods", "GET,OPTIONS" ) ]
-            , testHeader
+            , testHeader "Disallow credentials"
                 (conn |> allowCredentials False)
                 []
-            , testHeader
+            , testHeader "Allow credentials"
                 (conn |> allowCredentials True)
                 [ ( "access-control-allow-credentials", "true" ) ]
-            , testHeader
+            , testHeader "Negative max age"
                 (conn |> maxAge -1)
                 []
-            , testHeader
+            , testHeader "Zero max age"
                 (conn |> maxAge 0)
                 []
-            , testHeader
+            , testHeader "Positive max age"
                 (conn |> maxAge 10)
                 [ ( "access-control-max-age", "10" ) ]
-            , testHeader
+            , testHeader "Expose headers"
                 (conn
                     |> exposeHeaders [ "foo", "bar-car" ]
                 )
                 [ ( "access-control-expose-headers", "foo,bar-car" ) ]
-            , testHeader
+            , testHeader "Expose no headers"
                 (conn |> exposeHeaders [])
                 []
-            , testHeader
+            , testHeader "Null config"
                 (conn |> cors nullConfig)
                 []
-            , testHeader
+            , testHeader "Load from config"
                 (conn
                     |> cors
                         { nullConfig
@@ -209,42 +224,42 @@ nullConfig =
 
 
 type alias Conn =
-    Serverless.Types.Conn Bool Bool
+    Conn.Conn Config () () ()
 
 
 connWithHeader : String -> String -> Conn
 connWithHeader key value =
-    let
-        req =
-            conn.req
-    in
-        { conn | req = { req | headers = [ ( key, value ) ] } }
+    case
+        decodeString Request.decoder
+            ("""{
+  "body": "null",
+  "headers": {"""
+                ++ "\""
+                ++ key
+                ++ "\":\""
+                ++ value
+                ++ "\""
+                ++ """},
+  "host": "localhost",
+  "method": "GET",
+  "path": "/",
+  "port": 3000,
+  "queryParams": null,
+  "queryString": "?null=null",
+  "remoteIp": "127.0.0.1",
+  "scheme": "http",
+  "stage": "dev"
+}
+"""
+            )
+    of
+        Ok req ->
+            Conn.init "id" nullConfig () () req
+
+        Err err ->
+            Debug.crash "Failed to create conn with header"
 
 
 conn : Conn
 conn =
-    Serverless.Types.Conn
-        Processing
-        False
-        (Request
-            ""
-            NoBody
-            []
-            ""
-            GET
-            ""
-            80
-            (Ip4 ( 127, 0, 0, 1 ))
-            (Http Insecure)
-            ""
-            []
-        )
-        (Unsent
-            (Response
-                NoBody
-                Utf8
-                []
-                InvalidStatus
-            )
-        )
-        False
+    Conn.init "id" nullConfig () () Request.init

@@ -2,27 +2,30 @@ module Serverless.Cors
     exposing
         ( Config
         , Reflectable(..)
-        , configDecoder
-        , methodsDecoder
-        , reflectableDecoder
-        , cors
+        , allowCredentials
+        , allowHeaders
+        , allowMethods
         , allowOrigin
+        , configDecoder
+        , cors
         , exposeHeaders
         , maxAge
-        , allowCredentials
-        , allowMethods
-        , allowHeaders
+        , methodsDecoder
+        , reflectableDecoder
         )
 
 {-| CORS Middleware for elm-serverless.
+
 
 ## Types
 
 @docs Config, Reflectable
 
+
 ## Decoders
 
 @docs configDecoder, methodsDecoder, reflectableDecoder
+
 
 ## Middleware
 
@@ -30,12 +33,11 @@ module Serverless.Cors
 
 -}
 
-import Dict
-import Json.Decode exposing (andThen, bool, fail, int, list, oneOf, string, succeed, Decoder)
+import Json.Decode exposing (Decoder, andThen, bool, fail, int, list, oneOf, string, succeed)
 import Json.Decode.Pipeline exposing (decode, optional)
-import Serverless.Conn exposing (..)
-import Serverless.Conn.Types exposing (..)
-import Serverless.Types exposing (Conn)
+import Serverless.Conn as Conn exposing (..)
+import Serverless.Conn.Request exposing (Method(..))
+import Serverless.Conn.Response exposing (addHeader)
 import Toolkit.Helpers exposing (maybeList)
 
 
@@ -58,8 +60,9 @@ type alias Config =
 
 A reflectable value can either be
 
-* `ReflectRequest` derive the headers from the request
-* `Exactly` set to a specific value
+  - `ReflectRequest` derive the headers from the request
+  - `Exactly` set to a specific value
+
 -}
 type Reflectable a
     = ReflectRequest
@@ -85,8 +88,9 @@ configDecoder =
 
 {-| Decode a reflectable value from JSON.
 
-* `"*"` decodes to `ReflectRequest`
-* `"foo,bar"` or `["foo", "bar"]` decodes to `Exactly ["foo", "bar"]`
+  - `"*"` decodes to `ReflectRequest`
+  - `"foo,bar"` or `["foo", "bar"]` decodes to `Exactly ["foo", "bar"]`
+
 -}
 reflectableDecoder : Decoder (Reflectable (List String))
 reflectableDecoder =
@@ -194,8 +198,12 @@ methodsDecoder =
 This function is best used when the configuration is provided externally and
 decoded using `configDecoder`. For example, npm rc and AWS Lambda environment
 variables can be used as the source of CORS configuration.
+
 -}
-cors : Config -> Conn config model -> Conn config model
+cors :
+    Config
+    -> Conn config model route interop
+    -> Conn config model route interop
 cors config =
     allowOrigin config.origin
         >> exposeHeaders config.expose
@@ -209,57 +217,74 @@ cors config =
 
 `ReflectRequest` will reflect the request `origin` header, or if absent, will
 just be set to `*`
+
 -}
-allowOrigin : Reflectable (List String) -> Conn config model -> Conn config model
+allowOrigin :
+    Reflectable (List String)
+    -> Conn config model route interop
+    -> Conn config model route interop
 allowOrigin origin conn =
     case origin of
         ReflectRequest ->
-            conn
-                |> header
+            updateResponse
+                (addHeader
                     ( "access-control-allow-origin"
-                    , conn.req.headers
-                        |> Dict.fromList
-                        |> Dict.get "origin"
+                    , header "origin" conn
                         |> Maybe.withDefault "*"
                     )
+                )
+                conn
 
         Exactly origins ->
             if origins |> List.isEmpty then
                 conn
             else
-                conn
-                    |> header
+                updateResponse
+                    (addHeader
                         ( "access-control-allow-origin"
                         , origins |> String.join ","
                         )
+                    )
+                    conn
 
 
 {-| Sets `access-control-expose-headers`.
 -}
-exposeHeaders : List String -> Conn config model -> Conn config model
+exposeHeaders :
+    List String
+    -> Conn config model route interop
+    -> Conn config model route interop
 exposeHeaders headers conn =
     if headers |> List.isEmpty then
         conn
     else
-        conn
-            |> header
+        updateResponse
+            (addHeader
                 ( "access-control-expose-headers"
                 , headers |> String.join ","
                 )
+            )
+            conn
 
 
 {-| Sets `access-control-max-age`.
 
 If the value is not positive, the header will not be set.
+
 -}
-maxAge : Int -> Conn config model -> Conn config model
+maxAge :
+    Int
+    -> Conn config model route interop
+    -> Conn config model route interop
 maxAge age conn =
     if age > 0 then
-        conn
-            |> header
+        updateResponse
+            (addHeader
                 ( "access-control-max-age"
                 , age |> toString
                 )
+            )
+            conn
     else
         conn
 
@@ -267,59 +292,76 @@ maxAge age conn =
 {-| Sets `access-control-allow-credentials`.
 
 Only sets the header if the value is `True`.
+
 -}
-allowCredentials : Bool -> Conn config model -> Conn config model
+allowCredentials :
+    Bool
+    -> Conn config model route interop
+    -> Conn config model route interop
 allowCredentials allow conn =
     if allow then
-        conn |> header ( "access-control-allow-credentials", "true" )
+        updateResponse
+            (addHeader ( "access-control-allow-credentials", "true" ))
+            conn
     else
         conn
 
 
 {-| Sets `access-control-allow-methods`.
 -}
-allowMethods : List Method -> Conn config model -> Conn config model
+allowMethods :
+    List Method
+    -> Conn config model route interop
+    -> Conn config model route interop
 allowMethods methods conn =
     if methods |> List.isEmpty then
         conn
     else
-        conn
-            |> header
+        updateResponse
+            (addHeader
                 ( "access-control-allow-methods"
                 , methods |> List.map toString |> String.join ","
                 )
+            )
+            conn
 
 
 {-| Sets `access-control-allow-headers`.
 
 `ReflectRequest` will reflect the request `access-control-request-headers` headers
 or if absent, it will not set the header at all.
+
 -}
-allowHeaders : Reflectable (List String) -> Conn config model -> Conn config model
+allowHeaders :
+    Reflectable (List String)
+    -> Conn config model route interop
+    -> Conn config model route interop
 allowHeaders headers conn =
     case headers of
         ReflectRequest ->
             case
-                conn.req.headers
-                    |> Dict.fromList
-                    |> Dict.get "access-control-request-headers"
+                header "access-control-request-headers" conn
             of
                 Just requestHeaders ->
-                    conn
-                        |> header
+                    updateResponse
+                        (addHeader
                             ( "access-control-allow-headers"
                             , requestHeaders
                             )
+                        )
+                        conn
 
                 Nothing ->
                     conn
 
         Exactly h ->
-            if h |> List.isEmpty then
+            if List.isEmpty h then
                 conn
             else
-                conn
-                    |> header
+                updateResponse
+                    (addHeader
                         ( "access-control-allow-headers"
                         , h |> String.join ","
                         )
+                    )
+                    conn

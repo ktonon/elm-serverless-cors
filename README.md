@@ -16,9 +16,9 @@ There are two ways to use it.
 Set the headers that you need, individually.
 
 ```elm
-import Serverless.Conn exposing (pipeline, plug)
-import Serverless.Conn.Types exposing (Method(..))
+import Serverless.Conn.Request exposing (Method(..))
 import Serverless.Cors exposing (..)
+import Serverless.Plug exposing (pipeline, plug)
 
 
 myPipeline =
@@ -61,12 +61,13 @@ configDecoder =
 Then you can access the config from your `Conn` and use it to configure CORS.
 
 ```elm
-import Serverless.Conn exposing (pipeline, plug)
+import Serverless.Conn exposing (config)
+import Serverless.Plug exposing (pipeline, plug)
 import Serverless.Cors exposing (cors)
 
 myPipeline =
     pipeline
-        |> plug (\conn -> conn |> cors conn.config.cors)
+        |> plug (\conn -> conn |> cors (conn |> config |> .cors))
 ```
 
 On the JavaScript side, you can do something like this to map AWS Lambda environment variables to a JavaScript object.
