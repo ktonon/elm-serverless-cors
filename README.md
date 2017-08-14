@@ -67,7 +67,7 @@ import Serverless.Cors exposing (cors)
 
 myPipeline =
     pipeline
-        |> plug (\conn -> conn |> cors (conn |> config |> .cors))
+        |> plug (\conn -> cors (config conn |> .cors) conn)
 ```
 
 On the JavaScript side, you can do something like this to map AWS Lambda environment variables to a JavaScript object.
@@ -80,25 +80,23 @@ const elm = require('./API.elm');
 
 // Use AWS Lambda environment variables to override these values
 // See the npm rc package README for more details
-const config = rc('api', {
+const config = rc('myApi', {
   cors: {
     origin: '*',
     methods: 'get,post,options',
   },
-})
+});
 
 module.exports.handler = elmServerless.httpApi({
   handler: elm.API,
-  config: config,
-  requestPort: 'requestPort',
-  responsePort: 'responsePort',
+  config,
 });
 ```
 
 So in the [AWS Lambda console][], you can set environment variables, which will get loaded by [rc][] into a JavaScript configuration object, and passed into elm for decoding. In this example, you could set
 
-* `api_cors__origin=foo.com,bar.com`: decodes to `Exactly ["foo.com", "bar.com"]` for `origin`
-* `api_cors__credentials=true`: decodes to `True` for `credentials`
+* `myApi_cors__origin=foo.com,bar.com`: decodes to `Exactly ["foo.com", "bar.com"]` for `origin`
+* `myApi_cors__credentials=true`: decodes to `True` for `credentials`
 
 [AWS Lambda console]:https://console.aws.amazon.com/lambda/home
 [CORS]:https://en.wikipedia.org/wiki/Cross-origin_resource_sharing
