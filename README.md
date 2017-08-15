@@ -67,7 +67,7 @@ import Serverless.Cors exposing (cors)
 
 myPipeline =
     pipeline
-        |> plug (\conn -> cors (config conn |> .cors) conn)
+        |> plug (Cors.fromConfig .cors)
 ```
 
 On the JavaScript side, you can do something like this to map AWS Lambda environment variables to a JavaScript object.

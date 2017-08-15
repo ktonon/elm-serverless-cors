@@ -9,6 +9,7 @@ module Serverless.Cors
         , configDecoder
         , cors
         , exposeHeaders
+        , fromConfig
         , maxAge
         , methodsDecoder
         , reflectableDecoder
@@ -29,7 +30,12 @@ module Serverless.Cors
 
 ## Middleware
 
-@docs cors, allowOrigin, exposeHeaders, maxAge, allowCredentials, allowMethods, allowHeaders
+@docs fromConfig, allowOrigin, exposeHeaders, maxAge, allowCredentials, allowMethods, allowHeaders
+
+
+## Deprecated
+
+@docs cors
 
 -}
 
@@ -199,6 +205,16 @@ This function is best used when the configuration is provided externally and
 decoded using `configDecoder`. For example, npm rc and AWS Lambda environment
 variables can be used as the source of CORS configuration.
 
+-}
+fromConfig :
+    (config -> Config)
+    -> Conn config model route interop
+    -> Conn config model route interop
+fromConfig extract conn =
+    cors (conn |> Conn.config |> extract) conn
+
+
+{-| Deprecated. Use fromConfig.
 -}
 cors :
     Config
